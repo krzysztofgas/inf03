@@ -11940,6 +11940,8 @@ const quizy = {};
 let test = null;
 let timer = null;
 let pierwszyRender = true;
+let kierunek = 0;
+const malyRuch = window.matchMedia("(prefers-reduced-motion: reduce)");
 let pomijajFokus = false;
 let toastT = null;
 
@@ -12035,16 +12037,20 @@ function postepModulu(m) {
   };
 }
 
-function pasek(ulamek, etykieta) {
+function pasek(ulamek, etykieta, od) {
   const p = Math.round(ulamek * 100);
+  const ruch = od != null;
   return (
     '<div class="bar" role="progressbar" aria-label="' +
     esc(etykieta) +
     '" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' +
     p +
-    '"><span style="transform:scaleX(' +
+    '"><span' +
+    (ruch ? ' class="ruch"' : "") +
+    ' style="--do:' +
     ulamek.toFixed(3) +
-    ')"></span></div>'
+    (ruch ? ";--od:" + od.toFixed(3) : "") +
+    '"></span></div>'
   );
 }
 
@@ -12404,62 +12410,70 @@ function fragment(x, slowa) {
 const FAKTY = [
   {
     tytul: "Część pisemna",
+    liczby: "40 pytań · 60 minut · próg 50%",
     punkty: [
-      "Test na komputerze: 40 pytań zamkniętych.",
-      "Każde pytanie ma 4 odpowiedzi, tylko 1 jest dobra.",
-      "Czas: 60 minut.",
-      "Zdajesz od 50% (20 z 40 pytań).",
+      "Test na komputerze, każde pytanie ma 4 odpowiedzi.",
+      "Tylko 1 odpowiedź jest dobra.",
+      "Zdajesz od 20 dobrych odpowiedzi.",
     ],
   },
   {
     tytul: "Część praktyczna",
+    liczby: "150 minut · próg 75%",
     punkty: [
-      "Praca przy komputerze: baza danych, zapytania SQL, strona WWW i skrypt.",
-      "Czas: 150 minut.",
-      "Zdajesz od 75% punktów.",
-      "Narzędzia: XAMPP, phpMyAdmin, edytor kodu i przeglądarka.",
+      "Baza danych, zapytania SQL, strona WWW i skrypt.",
+      "Narzędzia: XAMPP, phpMyAdmin, edytor kodu.",
+      "Oddajesz pliki i zrzuty ekranu.",
     ],
   },
   {
     tytul: "Co musisz umieć",
+    liczby: "HTML · CSS · JS · PHP · SQL",
     punkty: [
-      "Zbudować stronę w HTML i CSS według rysunku.",
+      "Zbudować stronę według rysunku.",
       "Napisać zapytania SQL i zrobić zrzuty ekranu.",
       "Napisać skrypt PHP z bazą danych lub skrypt JavaScript.",
-      "Sprawdzić stronę w przeglądarce.",
     ],
   },
 ];
 
-function kartaModulu(m) {
+const KROKI_NAUKI = [
+  ["Czytaj i pisz", "Przeczytaj temat i **przepisz przykłady sam** w edytorze."],
+  ["Oznaczaj", "Kliknij **Oznacz jako przerobione**, gdy rozumiesz temat."],
+  ["Sprawdzaj", "Na końcu działu rozwiąż **quiz**. Błędy trafią do powtórki."],
+  ["Testuj", "Raz w tygodniu zrób **próbny test**: 40 pytań, 60 minut."],
+  ["Ćwicz arkusz", "Przed egzaminem zrób **całe zadanie praktyczne** na czas."],
+];
+
+function wierszSciezki(m) {
   const p = postepModulu(m);
   const najlepszy = stan.wyniki[m.id];
   return (
-    '<article class="card" ' +
+    '<li class="path-item" ' +
     kolor(m.id) +
-    '><div class="card-head"><span class="card-icon" aria-hidden="true">' +
+    '><span class="path-mark" aria-hidden="true">' +
     IKONY[m.id] +
-    '</span><h3><a href="#/m/' +
+    '</span><div class="path-body"><h3 class="path-title"><a href="#/m/' +
     m.id +
     '">' +
     esc(m.nazwa) +
-    "</a></h3></div><p>" +
+    '</a></h3><p class="path-desc">' +
     fmt(m.opis) +
-    '</p><div class="card-meta"><span>' +
+    '</p></div><div class="path-progress"><p class="path-count"><span><strong>' +
     liczba.format(p.zrobione) +
-    " / " +
+    "</strong> / " +
     ileTematow(p.wszystkie) +
     "</span><span>" +
     (najlepszy != null
-      ? "Quiz: " + procent.format(najlepszy)
+      ? "quiz " + procent.format(najlepszy)
       : ilePytan((m.quiz || []).length)) +
-    "</span></div>" +
+    "</span></p>" +
     pasek(p.ulamek, "Postęp: " + m.nazwa) +
-    '<div class="card-actions"><a class="btn" href="#/m/' +
+    '</div><div class="path-actions"><a class="btn btn-sm" href="#/m/' +
     m.id +
-    '">Ucz się</a><a class="btn btn-ghost" href="#/quiz/' +
+    '">Ucz się</a><a class="btn btn-sm btn-ghost" href="#/quiz/' +
     m.id +
-    '">Quiz</a></div></article>'
+    '">Quiz</a></div></li>'
   );
 }
 
@@ -12476,9 +12490,9 @@ function widokStart() {
   const najlepszy = stan.testy.length
     ? Math.max(...stan.testy.map((t) => t.wynik / t.max))
     : null;
-  const pierwszyEgz = egzaminMod ? tematyModulu(egzaminMod)[0] : null;
+  const egz = egzaminMod ? postepModulu(egzaminMod) : null;
   return (
-    '<div class="page page-wide"><section class="hero"><h1 tabindex="-1">Zdaj INF.03 krok po kroku</h1><p>Lekcje z HTML, CSS, JavaScript, PHP i SQL napisane prostym językiem. Do tego przykłady kodu, quizy w stylu egzaminu i próbny test na czas.</p><div class="btn-row">' +
+    '<div class="page page-wide home"><section class="hero"><div class="hero-main"><h1 tabindex="-1">Zdaj INF.03 krok po kroku</h1><p>Lekcje z HTML, CSS, JavaScript, PHP i SQL napisane prostym językiem. Do tego przykłady kodu, quizy w stylu egzaminu i próbny test na czas.</p><div class="btn-row">' +
     (cel
       ? '<a class="btn btn-primary" href="#/t/' +
         cel.temat.id +
@@ -12488,49 +12502,57 @@ function widokStart() {
           : "Zacznij naukę") +
         "</a>"
       : "") +
-    '<a class="btn" href="#/test">Próbny test (' +
-    TEST_ILE +
-    " pytań)</a>" +
-    (pierwszyEgz
-      ? '<a class="btn btn-ghost" href="#/m/egzamin">O egzaminie</a>'
-      : "") +
-    "</div></section>" +
-    '<div class="stats"><div class="stat"><span class="stat-value">' +
+    '<a class="btn" href="#/test">Próbny test</a></div></div>' +
+    '<div class="hero-progress"><h2 class="hp-title">Twój postęp</h2><p class="hp-num"><strong>' +
     liczba.format(zrobione) +
-    " / " +
+    "</strong> z " +
     liczba.format(tematy.length) +
-    '</span><span class="stat-label">przerobionych tematów</span></div><div class="stat"><span class="stat-value">' +
-    liczba.format(pytania.length) +
-    '</span><span class="stat-label">pytań w bazie quizów</span></div><div class="stat"><span class="stat-value">' +
-    liczba.format(ileBledow) +
-    '</span><span class="stat-label">' +
+    " tematów" +
+    "</p>" +
+    pasek(tematy.length ? zrobione / tematy.length : 0, "Postęp całego kursu") +
+    '<dl class="hp-list"><div><dt>Do powtórki</dt><dd>' +
     (ileBledow
-      ? '<a href="#/quiz/bledy">pytań do powtórki</a>'
-      : "pytań do powtórki") +
-    '</span></div><div class="stat"><span class="stat-value">' +
+      ? '<a href="#/quiz/bledy">' + ilePytan(ileBledow) + "</a>"
+      : "brak") +
+    "</dd></div><div><dt>Najlepszy test</dt><dd>" +
     (najlepszy != null ? procent.format(najlepszy) : "-") +
-    '</span><span class="stat-label">najlepszy próbny test</span></div></div>' +
-    '<h2 class="section-title">Języki i technologie</h2><div class="cards">' +
-    jezyki.map(kartaModulu).join("") +
-    "</div>" +
-    (egzaminMod
-      ? '<h2 class="section-title">Egzamin i inne zagadnienia</h2><div class="cards">' +
-        kartaModulu(egzaminMod) +
-        "</div>"
+    "</dd></div><div><dt>Baza quizów</dt><dd>" +
+    ilePytan(pytania.length) +
+    "</dd></div></dl></div></section>" +
+    '<section class="home-sec"><div class="sec-intro"><h2 class="section-title">Ścieżka nauki</h2><p>Ucz się w tej kolejności. Każdy dział kończy się quizem.</p></div><ol class="path">' +
+    jezyki.map(wierszSciezki).join("") +
+    "</ol></section>" +
+    '<section class="home-sec"><div class="sec-intro"><h2 class="section-title">Jak wygląda egzamin INF.03</h2>' +
+    (egz
+      ? '<p><a href="#/m/egzamin">Wszystko o egzaminie</a> - przebieg, ściągi i zagadnienia spoza kodu (' +
+        liczba.format(egz.zrobione) +
+        " / " +
+        ileTematow(egz.wszystkie) +
+        ").</p>"
       : "") +
-    '<h2 class="section-title">Jak wygląda egzamin INF.03</h2><div class="facts">' +
+    '</div><div class="facts">' +
     FAKTY.map(
       (f) =>
         '<div class="fact"><h3>' +
         esc(f.tytul) +
-        "</h3><ul>" +
+        '</h3><p class="fact-nums">' +
+        esc(f.liczby) +
+        "</p><ul>" +
         f.punkty.map((p) => "<li>" + fmt(p) + "</li>").join("") +
         "</ul></div>",
     ).join("") +
-    "</div>" +
-    '<h2 class="section-title">Jak się uczyć z tej strony</h2><div class="content"><ol><li>Przeczytaj temat i <strong>przepisz przykłady sam</strong> w edytorze. Samo czytanie to za mało.</li><li>Kliknij <strong>Oznacz jako przerobione</strong>, gdy rozumiesz temat.</li><li>Na końcu działu rozwiąż <strong>quiz</strong>. Błędne odpowiedzi trafią do powtórki.</li><li>Raz w tygodniu zrób <strong>próbny test</strong> na czas: 40 pytań, 60 minut.</li><li>Przed egzaminem przećwicz <strong>całe zadanie praktyczne</strong>: baza, zapytania, strona i skrypt.</li></ol></div>' +
-    '<div class="btn-row spaced-top"><button class="btn btn-danger" type="button" data-akcja="reset">Wyczyść postęp nauki</button></div>' +
-    '<p class="footer-note">Strona do samodzielnej nauki. To nie jest oficjalny materiał CKE. Postęp zapisuje się tylko w tej przeglądarce.</p></div>'
+    "</div></section>" +
+    '<section class="home-sec"><div class="sec-intro"><h2 class="section-title">Jak się uczyć z tej strony</h2></div><ol class="steps">' +
+    KROKI_NAUKI.map(
+      ([t, o]) =>
+        '<li><strong class="step-title">' +
+        esc(t) +
+        "</strong><span>" +
+        fmt(o) +
+        "</span></li>",
+    ).join("") +
+    "</ol></section>" +
+    '<footer class="home-foot"><p class="footer-note">Strona do samodzielnej nauki. To nie jest oficjalny materiał CKE. Postęp zapisuje się tylko w tej przeglądarce.</p><button class="btn btn-sm btn-danger" type="button" data-akcja="reset">Wyczyść postęp nauki</button></footer></div>'
   );
 }
 
@@ -12547,22 +12569,21 @@ function widokModul(id) {
     kolor(m.id) +
     ">" +
     okruchy([["Start", "#/"], [m.nazwa]]) +
-    '<h1 class="page-title" tabindex="-1">' +
+    '<header class="mod-head"><h1 class="page-title" tabindex="-1">' +
     esc(m.nazwa) +
     '</h1><p class="lead">' +
     fmt(m.opis) +
-    "</p>" +
-    '<div class="stats"><div class="stat"><span class="stat-value">' +
+    '</p><div class="mod-status"><p class="mod-count"><strong>' +
     p.zrobione +
-    " / " +
-    p.wszystkie +
-    '</span><span class="stat-label">przerobionych tematów</span></div><div class="stat"><span class="stat-value">' +
-    liczba.format((m.quiz || []).length) +
-    '</span><span class="stat-label">pytań w quizie</span></div><div class="stat"><span class="stat-value">' +
-    (najlepszy != null ? procent.format(najlepszy) : "-") +
-    '</span><span class="stat-label">najlepszy wynik quizu</span></div></div>' +
+    "</strong> z " +
+    liczba.format(p.wszystkie) +
+    " tematów przerobionych</p>" +
     pasek(p.ulamek, "Postęp: " + m.nazwa) +
-    '<div class="btn-row spaced">' +
+    '<p class="mod-facts">' +
+    ilePytan((m.quiz || []).length) +
+    " w quizie · najlepszy wynik: " +
+    (najlepszy != null ? procent.format(najlepszy) : "-") +
+    '</p></div><div class="btn-row">' +
     (nastepny
       ? '<a class="btn btn-primary" href="#/t/' +
         nastepny.temat.id +
@@ -12572,17 +12593,20 @@ function widokModul(id) {
       : "") +
     '<a class="btn" href="#/quiz/' +
     m.id +
-    '">Quiz (' +
-    ilePytan((m.quiz || []).length) +
-    ")</a></div>" +
+    '">Rozwiąż quiz</a></div></header>' +
     m.dzialy
-      .map(
-        (d, i) =>
-          '<section class="sec-block"><h2><span class="sec-num">' +
-          String(i + 1).padStart(2, "0") +
-          "</span>" +
+      .map((d) => {
+        const ile = d.tematy.filter((t) => stan.przerobione[t.id]).length;
+        return (
+          '<section class="sec-block"><div class="sec-head"><h2>' +
           fmt(d.tytul) +
-          '</h2><ul class="topic-list">' +
+          '</h2><span class="sec-count' +
+          (ile === d.tematy.length ? " full" : "") +
+          '">' +
+          ile +
+          " / " +
+          d.tematy.length +
+          '</span></div><ul class="topic-list">' +
           d.tematy
             .map((t) => {
               const z = !!stan.przerobione[t.id];
@@ -12601,8 +12625,9 @@ function widokModul(id) {
               );
             })
             .join("") +
-          "</ul></section>",
-      )
+          "</ul></section>"
+        );
+      })
       .join("") +
     "</div>"
   );
@@ -12795,20 +12820,21 @@ function ekranPytania(id, q) {
   const dobre = q.odp.filter((o, i) => o === q.pytania[i].poprawna).length;
   const ok = odp === p.poprawna;
   const kol = id === "bledy" ? kolor(p.modul) : kolor(id);
+  const n = q.pytania.length;
   return (
     '<div class="quiz-shell" ' +
     kol +
     '><div class="quiz-top"><h1 class="quiz-title">' +
     esc(nazwaQuizu(id)) +
-    "</h1><span>Pytanie " +
+    '</h1><p class="quiz-meta">Pytanie ' +
     (q.i + 1) +
     " z " +
-    q.pytania.length +
+    n +
     " · poprawne: " +
     dobre +
-    "</span></div>" +
-    pasek((q.i + (jest ? 1 : 0)) / q.pytania.length, "Postęp quizu") +
-    '<div class="q-card spaced-top-sm"><h2 class="q-text" tabindex="-1" data-fokus>' +
+    "</p></div>" +
+    pasek((q.i + (jest ? 1 : 0)) / n, "Postęp quizu", jest ? q.i / n : null) +
+    '<div class="q-card"><h2 class="q-text" tabindex="-1" data-fokus>' +
     fmt(p.pytanie) +
     "</h2>" +
     listaOdpowiedzi(p, "quiz-odp", odp, jest) +
@@ -12830,10 +12856,10 @@ function ekranPytania(id, q) {
     '">Wróć do nauki</a>' +
     (jest
       ? '<button class="btn btn-primary" type="button" data-akcja="quiz-dalej" id="dalejBtn">' +
-        (q.i + 1 < q.pytania.length ? "Następne pytanie" : "Zobacz wynik") +
+        (q.i + 1 < n ? "Następne pytanie" : "Zobacz wynik") +
         "</button>"
       : "") +
-    '</div><p class="hint">Skróty: <kbd>1</kbd>-<kbd>4</kbd> albo <kbd>A</kbd>-<kbd>D</kbd> wybierają odpowiedź, <kbd>Enter</kbd> przechodzi dalej.</p></div></div>'
+    '</div></div><p class="hint">Skróty: <kbd>1</kbd>-<kbd>4</kbd> albo <kbd>A</kbd>-<kbd>D</kbd> wybierają odpowiedź, <kbd>Enter</kbd> przechodzi dalej.</p></div>'
   );
 }
 
@@ -12845,16 +12871,51 @@ function komentarz(u) {
   return "Na egzaminie to za mało (próg to 50%). Wróć do tematów i spróbuj jeszcze raz.";
 }
 
+function panelWyniku(tytul, dobre, max, opis, przyciski) {
+  const u = max ? dobre / max : 0;
+  const zdany = u >= TEST_PROG;
+  return (
+    '<section class="result ' +
+    (zdany ? "pass" : "fail") +
+    '" style="--u:' +
+    u.toFixed(3) +
+    ";--prog:" +
+    TEST_PROG +
+    '"><h1 class="page-title" tabindex="-1">' +
+    esc(tytul) +
+    '</h1><p class="result-score"><span aria-hidden="true"><span data-licz="' +
+    dobre +
+    '">' +
+    dobre +
+    "</span> / " +
+    max +
+    '</span><span class="sr-only">' +
+    dobre +
+    " z " +
+    max +
+    '</span></p><div class="meter" aria-hidden="true"><span class="meter-fill"></span><span class="meter-prog"><span>próg ' +
+    procent.format(TEST_PROG) +
+    "</span></span></div><p>" +
+    opis +
+    '</p><div class="btn-row">' +
+    przyciski +
+    "</div></section>"
+  );
+}
+
 function przeglad(lista, odp, tylkoBledne) {
   const elementy = lista
     .map((p, i) => ({ p, i, o: odp[i] }))
     .filter((x) => !tylkoBledne || x.o !== x.p.poprawna)
     .map(({ p, i, o }) => {
       const ok = o === p.poprawna;
+      const stanOdp = ok ? "ok" : o == null ? "none" : "bad";
       return (
-        '<li class="review-item' +
-        (ok ? "" : " bad") +
-        '"><h3>' +
+        '<li class="review-item ' +
+        stanOdp +
+        '"><p class="review-status">' +
+        (ok ? "Dobrze" : o == null ? "Brak odpowiedzi" : "Źle") +
+        "</p><h3>" +
         (i + 1) +
         ". " +
         fmt(p.pytanie) +
@@ -12876,15 +12937,13 @@ function przeglad(lista, odp, tylkoBledne) {
               "</li>",
           )
           .join("") +
-        "</ul>" +
-        (o == null ? "<p><strong>Brak odpowiedzi.</strong></p>" : "") +
-        "<p>" +
+        "</ul><p>" +
         fmt(p.wyjasnienie) +
         "</p></li>"
       );
     });
   if (!elementy.length)
-    return '<div class="empty spaced-top"><p>Brak błędnych odpowiedzi. Gratulacje!</p></div>';
+    return '<div class="empty"><p>Brak błędnych odpowiedzi. Gratulacje!</p></div>';
   return '<ol class="review">' + elementy.join("") + "</ol>";
 }
 
@@ -12898,32 +12957,25 @@ function ekranWynikuQuizu(id, q) {
     kol +
     ">" +
     okruchyQuizu(id) +
-    '<div class="result"><h1 class="page-title" tabindex="-1">Wynik: ' +
-    esc(nazwaQuizu(id)) +
-    '</h1><div class="result-score ' +
-    (u >= TEST_PROG ? "result-pass" : "result-fail") +
-    '">' +
-    dobre +
-    " / " +
-    q.pytania.length +
-    "</div><p>" +
-    procent.format(u) +
-    " poprawnych odpowiedzi. " +
-    komentarz(u) +
-    "</p>" +
-    '<div class="btn-row"><button class="btn btn-primary" type="button" data-akcja="quiz-reset" data-id="' +
-    esc(id) +
-    '">Rozwiąż jeszcze raz</button>' +
-    (id !== "bledy"
-      ? '<a class="btn" href="#/m/' + id + '">Wróć do działu</a>'
-      : '<a class="btn" href="#/">Wróć na start</a>') +
-    (zle && id !== "bledy"
-      ? '<a class="btn btn-ghost" href="#/quiz/bledy">Powtórka błędów</a>'
-      : "") +
-    "</div></div>" +
+    panelWyniku(
+      "Wynik: " + nazwaQuizu(id),
+      dobre,
+      q.pytania.length,
+      procent.format(u) + " poprawnych odpowiedzi. " + komentarz(u),
+      '<button class="btn btn-primary" type="button" data-akcja="quiz-reset" data-id="' +
+        esc(id) +
+        '">Rozwiąż jeszcze raz</button>' +
+        (id !== "bledy"
+          ? '<a class="btn" href="#/m/' + id + '">Wróć do działu</a>'
+          : '<a class="btn" href="#/">Wróć na start</a>') +
+        (zle && id !== "bledy"
+          ? '<a class="btn btn-ghost" href="#/quiz/bledy">Powtórka błędów</a>'
+          : ""),
+    ) +
     (zle
-      ? '<h2 class="section-title">Pytania z błędną odpowiedzią</h2>' +
-        przeglad(q.pytania, q.odp, true)
+      ? '<section class="review-sec"><h2 class="section-title">Pytania z błędną odpowiedzią</h2>' +
+        przeglad(q.pytania, q.odp, true) +
+        "</section>"
       : "") +
     "</div>"
   );
@@ -12963,7 +13015,7 @@ function ekranStartTestu() {
     " dobrych odpowiedzi.</li><li>Odpowiedzi możesz zmieniać aż do końca testu. Wynik zobaczysz na końcu.</li></ul></div>" +
     '<div class="btn-row"><button class="btn btn-primary" type="button" data-akcja="test-start">Rozpocznij test</button></div></div>' +
     (historia.length
-      ? '<h2 class="section-title">Ostatnie wyniki</h2><div class="table-wrap" tabindex="0" role="region" aria-label="Ostatnie wyniki"><table><thead><tr><th scope="col">Data</th><th scope="col">Wynik</th><th scope="col">Procent</th><th scope="col">Status</th></tr></thead><tbody>' +
+      ? '<section class="review-sec"><h2 class="section-title">Ostatnie wyniki</h2><div class="table-wrap" tabindex="0" role="region" aria-label="Ostatnie wyniki"><table><thead><tr><th scope="col">Data</th><th scope="col">Wynik</th><th scope="col">Procent</th><th scope="col">Status</th></tr></thead><tbody>' +
         historia
           .map(
             (t) =>
@@ -12980,7 +13032,7 @@ function ekranStartTestu() {
               "</td></tr>",
           )
           .join("") +
-        "</tbody></table></div>"
+        "</tbody></table></div></section>"
       : "") +
     "</div>"
   );
@@ -12991,18 +13043,23 @@ function ekranTestu() {
   const odp = test.odp[test.i];
   const zostalo = test.termin - Date.now();
   const odpowiedziane = test.odp.filter((o) => o != null).length;
+  const u = odpowiedziane / test.pytania.length;
+  const od = test.pasek == null ? u : test.pasek;
+  test.pasek = u;
   return (
-    '<div class="quiz-shell" ' +
+    '<div class="quiz-shell test-shell" ' +
     kolor(p.modul) +
-    '><div class="quiz-top"><h1 class="quiz-title">Próbny test INF.03</h1><span>Odpowiedziano: ' +
+    '><div class="test-bar"><div class="test-bar-row"><div><h1 class="quiz-title">Próbny test INF.03</h1><p class="quiz-meta">Odpowiedziano: ' +
     odpowiedziane +
     " / " +
     test.pytania.length +
-    '</span><span class="timer' +
+    '</p></div><span class="timer' +
     (zostalo < 300000 ? " low" : "") +
     '" id="timer" role="timer" aria-label="Pozostały czas">' +
     czasTekst(zostalo) +
     "</span></div>" +
+    pasek(u, "Odpowiedziane pytania", od) +
+    "</div>" +
     '<div class="q-card"><p class="quiz-num">Pytanie ' +
     (test.i + 1) +
     " z " +
@@ -13017,8 +13074,9 @@ function ekranTestu() {
     (test.i + 1 < test.pytania.length
       ? '<button class="btn btn-primary" type="button" data-akcja="test-nast">Następne</button>'
       : '<button class="btn btn-primary" type="button" data-akcja="test-zakoncz">Zakończ test</button>') +
-    '</div><p class="hint">Skróty: <kbd>1</kbd>-<kbd>4</kbd> albo <kbd>A</kbd>-<kbd>D</kbd> wybierają odpowiedź, <kbd>←</kbd> <kbd>→</kbd> zmieniają pytanie.</p></div>' +
-    '<div class="q-grid" role="group" aria-label="Przejdź do pytania">' +
+    "</div></div>" +
+    '<section class="q-panel" aria-labelledby="qPanelTytul"><div class="q-panel-head"><h2 class="q-panel-title" id="qPanelTytul">Wszystkie pytania</h2><button class="btn btn-sm btn-danger" type="button" data-akcja="test-zakoncz">Zakończ test</button></div>' +
+    '<div class="q-grid" role="group" aria-labelledby="qPanelTytul">' +
     test.pytania
       .map(
         (x, k) =>
@@ -13036,7 +13094,7 @@ function ekranTestu() {
           "</button>",
       )
       .join("") +
-    '</div><div class="btn-row spaced-top end"><button class="btn btn-danger" type="button" data-akcja="test-zakoncz">Zakończ test</button></div></div>'
+    '</div><p class="hint">Odpowiedzi możesz zmieniać do końca testu. Skróty: <kbd>1</kbd>-<kbd>4</kbd> albo <kbd>A</kbd>-<kbd>D</kbd> wybierają odpowiedź, <kbd>←</kbd> <kbd>→</kbd> zmieniają pytanie.</p></section></div>'
   );
 }
 
@@ -13047,35 +13105,28 @@ function ekranWynikuTestu() {
   return (
     '<div class="quiz-shell">' +
     okruchy([["Start", "#/"], ["Wynik próbnego testu"]]) +
-    '<div class="result"><h1 class="page-title" tabindex="-1">' +
-    (zdany ? "Test zdany" : "Test niezdany") +
-    '</h1><div class="result-score ' +
-    (zdany ? "result-pass" : "result-fail") +
-    '">' +
-    w.dobre +
-    " / " +
-    w.max +
-    "</div><p>" +
-    procent.format(u) +
-    " poprawnych odpowiedzi (próg: " +
-    procent.format(TEST_PROG) +
-    "). Czas: " +
-    czasTekst(w.czas) +
-    ". " +
-    komentarz(u) +
-    "</p>" +
-    '<div class="btn-row"><button class="btn btn-primary" type="button" data-akcja="test-nowy">Nowy test</button>' +
-    (w.dobre < w.max
-      ? '<a class="btn" href="#/quiz/bledy">Powtórka błędów</a>'
-      : "") +
-    '<a class="btn btn-ghost" href="#/">Wróć na start</a></div></div>' +
-    '<h2 class="section-title">Przegląd odpowiedzi</h2><div class="filters" role="group" aria-label="Filtr pytań"><button class="btn' +
+    panelWyniku(
+      zdany ? "Test zdany" : "Test niezdany",
+      w.dobre,
+      w.max,
+      procent.format(u) +
+        " poprawnych odpowiedzi. Czas: " +
+        czasTekst(w.czas) +
+        ". " +
+        komentarz(u),
+      '<button class="btn btn-primary" type="button" data-akcja="test-nowy">Nowy test</button>' +
+        (w.dobre < w.max
+          ? '<a class="btn" href="#/quiz/bledy">Powtórka błędów</a>'
+          : "") +
+        '<a class="btn btn-ghost" href="#/">Wróć na start</a>',
+    ) +
+    '<section class="review-sec"><h2 class="section-title">Przegląd odpowiedzi</h2><div class="filters" role="group" aria-label="Filtr pytań"><button class="btn btn-sm' +
     (test.filtr === "bledne" ? " btn-primary" : "") +
     '" type="button" data-akcja="test-filtr" data-f="bledne" aria-pressed="' +
     (test.filtr === "bledne") +
     '">Tylko błędne (' +
     (w.max - w.dobre) +
-    ')</button><button class="btn' +
+    ')</button><button class="btn btn-sm' +
     (test.filtr === "wszystkie" ? " btn-primary" : "") +
     '" type="button" data-akcja="test-filtr" data-f="wszystkie" aria-pressed="' +
     (test.filtr === "wszystkie") +
@@ -13083,7 +13134,7 @@ function ekranWynikuTestu() {
     w.max +
     ")</button></div>" +
     przeglad(test.pytania, test.odp, test.filtr === "bledne") +
-    "</div>"
+    "</section></div>"
   );
 }
 
@@ -13307,6 +13358,20 @@ function dopasujPodglad(f) {
   }
 }
 
+function liczOd0(el) {
+  const cel = Number(el.dataset.licz);
+  if (malyRuch.matches || !cel) return;
+  const start = performance.now();
+  const czas = 900;
+  const krok = (t) => {
+    const x = Math.min(1, (t - start) / czas);
+    el.textContent = Math.round(cel * (1 - Math.pow(1 - x, 4)));
+    if (x < 1 && el.isConnected) requestAnimationFrame(krok);
+  };
+  el.textContent = "0";
+  requestAnimationFrame(krok);
+}
+
 function renderuj(opcje) {
   const o = opcje || {};
   zatrzymajTimer();
@@ -13321,6 +13386,15 @@ function renderuj(opcje) {
   else if (a === "szukaj") html = widokSzukaj(params.get("q") || "");
   else html = widok404();
   app.innerHTML = html;
+  if (!o.zachowajPozycje && !pierwszyRender && app.firstElementChild) {
+    app.firstElementChild.classList.add("wejscie");
+    app.querySelectorAll("[data-licz]").forEach(liczOd0);
+  }
+  if (kierunek) {
+    const karta = app.querySelector(".q-card");
+    if (karta) karta.classList.add(kierunek > 0 ? "q-dalej" : "q-wstecz");
+    kierunek = 0;
+  }
   app
     .querySelectorAll("iframe[data-podglad]")
     .forEach((f) => f.addEventListener("load", () => dopasujPodglad(f)));
@@ -13447,8 +13521,10 @@ function odpowiedzQuiz(id, n) {
 function dalejQuiz(id) {
   const q = quizy[id];
   if (!q || q.odp[q.i] == null) return;
-  if (q.i + 1 < q.pytania.length) q.i++;
-  else {
+  if (q.i + 1 < q.pytania.length) {
+    q.i++;
+    kierunek = 1;
+  } else {
     q.koniec = true;
     if (id !== "bledy") {
       const u =
@@ -13482,7 +13558,9 @@ function startTestu() {
 
 function idzDoPytania(n) {
   if (!test || test.koniec) return;
-  test.i = Math.max(0, Math.min(test.pytania.length - 1, n));
+  const cel = Math.max(0, Math.min(test.pytania.length - 1, n));
+  kierunek = Math.sign(cel - test.i);
+  test.i = cel;
   renderuj({ zachowajPozycje: true });
 }
 
@@ -13490,6 +13568,8 @@ function odpowiedzTest(n) {
   if (!test || test.koniec) return;
   test.odp[test.i] = test.odp[test.i] === n ? null : n;
   odswiez('[data-akcja="test-odp"][data-n="' + n + '"]');
+  const wybrana = app.querySelector('[data-akcja="test-odp"][data-n="' + n + '"]');
+  if (wybrana) wybrana.classList.add("swiezo");
 }
 
 function zakonczTest() {
